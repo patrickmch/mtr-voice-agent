@@ -2,8 +2,8 @@ import logging
 from dotenv import load_dotenv
 
 from livekit import agents
-from livekit.agents import Agent, AgentSession, RoomInputOptions
-from livekit.plugins import deepgram, openai, cartesia, silero
+from livekit.agents import Agent, AgentSession, RoomInputOptions, AgentServer
+from livekit.plugins import deepgram, cartesia, silero, anthropic
 
 from properties import get_all_properties, get_property_details, check_availability
 
@@ -11,11 +11,14 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("mtr-agent")
 
+# Create server for explicit agent dispatch (required for telephony)
+server = AgentServer()
+
 # Store leads in memory (just for demo - logs to console)
 leads = []
 
 
-SYSTEM_PROMPT = """You are a friendly leasing assistant for Boulder Mid-Term Rentals. You help prospective tenants learn about available furnished rental properties.
+SYSTEM_PROMPT = """You are a friendly leasing assistant for Patrick's mid-term rentals. You help prospective tenants learn about available furnished rental properties.
 
 ## Your personality
 - Warm, helpful, and efficient
@@ -23,13 +26,18 @@ SYSTEM_PROMPT = """You are a friendly leasing assistant for Boulder Mid-Term Ren
 - Keep responses concise (1-3 sentences) since this is voice
 
 ## What you can help with
-- Describe available properties (we have a downtown studio and a North Boulder 2-bedroom)
+- Describe available properties using the list_available_properties tool
 - Answer questions about rent, amenities, pet policies, availability dates
 - Collect contact information from interested renters
 
+## Important: Use your tools!
+- Always use list_available_properties to see what's currently available
+- Use get_property_info to get details about a specific property
+- Property information comes from the database - don't make up details
+
 ## What you should know
-- All properties are furnished mid-term rentals (1-11 month stays)
-- We cater to traveling professionals, remote workers, and people in transition
+- All properties are furnished mid-term rentals (minimum 1 month stay)
+- We cater to traveling healthcare professionals, remote workers, and people in transition
 - Application process: online application, background check, first month + security deposit
 - We respond to applications within 24-48 hours
 
@@ -39,7 +47,7 @@ SYSTEM_PROMPT = """You are a friendly leasing assistant for Boulder Mid-Term Ren
 3. If they're interested, collect their name and email
 4. Confirm next steps and end professionally
 
-If someone asks something you can't help with, politely say you're just the leasing assistant and can take a message for the property manager."""
+If someone asks something you can't help with, politely say you're just the leasing assistant and can take a message for the property manager Patrick."""
 
 
 class MTRAgent(Agent):
@@ -109,25 +117,26 @@ class MTRAgent(Agent):
         return f"I've saved your information. Someone from our team will reach out to {email} within 24 hours to help you with next steps for the {property_interest if property_interest else 'property'}."
 
 
+@server.rtc_session(agent_name="mtr-voice-agent")
 async def entrypoint(ctx: agents.JobContext):
     """Main entry point for the voice agent."""
-    
+
     logger.info(f"Agent starting for room: {ctx.room.name}")
-    
+
     await ctx.connect()
-    
+
     session = AgentSession(
         vad=silero.VAD.load(),
         stt=deepgram.STT(),
-        llm=openai.LLM(model="gpt-4o"),
+        llm=anthropic.LLM(model="claude-sonnet-4-20250514"),
         tts=cartesia.TTS(),
     )
-    
+
     await session.start(
         room=ctx.room,
         agent=MTRAgent(),
     )
-    
+
     # Initial greeting
     await session.generate_reply(
         instructions="Greet the user warmly and ask how you can help them with their housing search today."
@@ -135,4 +144,4 @@ async def entrypoint(ctx: agents.JobContext):
 
 
 if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
+    agents.cli.run_app(server)
