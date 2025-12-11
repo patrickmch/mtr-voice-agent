@@ -35,6 +35,8 @@ PROPERTIES_TO_SEED = [
             "_amenities": "Full kitchen,Washer/dryer in unit,WiFi included,Free parking,Air conditioning,Heating",
             "_pets": "Allowed (pet deposit required)",
             "_smoking": "Not allowed",
+            "_available_from": "January 15, 2025",
+            "_available_until": "Open ended",
         }
     },
     {
@@ -60,6 +62,8 @@ PROPERTIES_TO_SEED = [
             "_pets": "Allowed ($400 refundable pet deposit)",
             "_smoking": "Not allowed",
             "_accessibility": "Stairs at entrance",
+            "_available_from": "Available now",
+            "_available_until": "Open ended",
         }
     }
 ]

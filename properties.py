@@ -127,16 +127,16 @@ def get_all_properties() -> str:
         sys = p.get("system", {})
         name = sys.get("name", "Unknown Property")
         city = sys.get("city", "")
-        state = sys.get("state", "")
         bedrooms = sys.get("bedrooms", "Unknown")
         rent = sys.get("monthly_rent", "Contact for pricing")
+        available_from = sys.get("available_from", "")
 
-        location = f"{city}, {state}" if city and state else ""
+        avail_text = f", available {available_from.lower()}" if available_from else ""
         summaries.append(
-            f"The {name} in {location} is a {bedrooms} bedroom for ${rent} per month."
+            f"{bedrooms} bedroom in {city} for ${rent}/month{avail_text}"
         )
 
-    return " ".join(summaries)
+    return ". ".join(summaries) + "."
 
 
 def get_property_details(property_name: str) -> str:
@@ -144,59 +144,32 @@ def get_property_details(property_name: str) -> str:
     p = find_property(property_name)
 
     if not p:
-        # Get available property names for helpful response
         properties = load_properties_from_db()
-        available = [prop.get("system", {}).get("nickname", "unknown") for prop in properties]
-        return f"I couldn't find a property matching '{property_name}'. We have properties in: {', '.join(available)}."
+        available = [prop.get("system", {}).get("city", "unknown") for prop in properties]
+        return f"I don't have a property matching that. We have places in {', '.join(available)}."
 
     sys = p.get("system", {})
-    ctx = p.get("context", {})
 
-    # Build response from system data
-    name = sys.get("name", "the property")
-    address = sys.get("address", "")
     city = sys.get("city", "")
-    state = sys.get("state", "")
-    city_state = f"{city}, {state}" if city and state else ""
-
-    bedrooms = sys.get("bedrooms", "Unknown")
-    bathrooms = sys.get("bathrooms", "Unknown")
-    layout = sys.get("layout", "")
-    size = sys.get("size_sqft", "")
-
-    rent = sys.get("monthly_rent", "Contact for pricing")
-    utilities = "included" if sys.get("utilities_included", "").lower() == "true" else "not included"
-    min_stay = sys.get("minimum_stay", "1")
+    bedrooms = sys.get("bedrooms", "")
+    bathrooms = sys.get("bathrooms", "")
+    rent = sys.get("monthly_rent", "")
+    utilities = "utilities included" if sys.get("utilities_included", "").lower() == "true" else ""
+    available_from = sys.get("available_from", "")
+    pets = sys.get("pets", "")
     deposit = sys.get("deposit", "")
-    cleaning_fee = sys.get("cleaning_fee", "")
-    pet_deposit = sys.get("pet_deposit", "")
 
-    amenities = sys.get("amenities", "")
-    pets = sys.get("pets", "Ask about pet policy")
-    smoking = sys.get("smoking", "")
-
-    response = f"""The {name} is located at {address} in {city_state}.
-It's a {bedrooms} bedroom, {bathrooms} bathroom unit. {layout}
-{f'The space is {size} square feet. ' if size else ''}
-Monthly rent is ${rent} with utilities {utilities}. Minimum stay is {min_stay} month.
-Amenities include: {amenities.replace(',', ', ')}.
-Pet policy: {pets}. {f'No smoking allowed.' if smoking == 'Not allowed' else ''}"""
-
+    parts = []
+    parts.append(f"{bedrooms} bed, {bathrooms} bath in {city}")
+    parts.append(f"${rent} a month{', ' + utilities if utilities else ''}")
+    if available_from:
+        parts.append(f"available {available_from.lower()}")
+    if pets:
+        parts.append(f"pets: {pets.lower()}")
     if deposit:
-        response += f" Security deposit is ${deposit} refundable."
-    if cleaning_fee:
-        response += f" There's a ${cleaning_fee} cleaning fee."
-    if pet_deposit:
-        response += f" Pet deposit is ${pet_deposit} refundable."
+        parts.append(f"${deposit} deposit")
 
-    # Add any user-added context
-    if ctx:
-        response += "\n\nAdditional information:"
-        for key, value in ctx.items():
-            formatted_key = key.replace("_", " ").title()
-            response += f"\n{formatted_key}: {value}"
-
-    return response
+    return ". ".join(parts) + "."
 
 
 def check_availability(property_name: str, move_in: str, move_out: str) -> str:
@@ -204,13 +177,12 @@ def check_availability(property_name: str, move_in: str, move_out: str) -> str:
     p = find_property(property_name)
 
     if not p:
-        return "I couldn't find that property. Would you like to hear about what we have available?"
+        return "I couldn't find that property."
 
     sys = p.get("system", {})
-    min_stay = sys.get("minimum_stay", "1")
     name = sys.get("name", "the property")
+    available_from = sys.get("available_from", "unknown")
+    available_until = sys.get("available_until", "open ended")
+    min_stay = sys.get("minimum_stay", "1")
 
-    return f"""The {name} has a minimum stay of {min_stay} month.
-For your dates of {move_in} to {move_out}, availability changes regularly based on bookings.
-I'd recommend submitting an application so we can confirm exact availability for your dates.
-Would you like information on how to apply?"""
+    return f"{name} is available from {available_from}. Minimum stay is {min_stay} month. Your dates: {move_in} to {move_out}."
